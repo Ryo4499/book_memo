@@ -78,7 +78,7 @@
 						<a
 							class="list-group-item"
 							th:text="${category.category}"
-							th:href="@{/memo/category/{categoryName} (categoryName=${category.category})}"
+							th:href="@{'/memo/category/?page=1'+'&selectCategory='+${category.category}}"
 						>
 							Category 1
 						</a>

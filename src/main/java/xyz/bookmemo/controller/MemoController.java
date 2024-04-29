@@ -3,10 +3,10 @@ package xyz.bookmemo.controller;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Optional;
 import javax.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import org.springframework.web.server.ResponseStatusException;
 import xyz.bookmemo.entity.Account;
 import xyz.bookmemo.entity.Memo;
 import xyz.bookmemo.form.MemoForm;
@@ -262,6 +263,7 @@ public class MemoController {
       return "memo/memo-create";
     }
     final Memo memo = makeMemo(memoForm, customSecurityAccount);
+    memo.setMemoId(null);
     memo.setCreatedDate(new Date());
     memo.setUpdatedDate(new Date());
     memoRepository.save(memo);
@@ -276,19 +278,16 @@ public class MemoController {
       Model model,
       HttpServletRequest req) {
     final long memoId = Long.parseLong(params.get("memoId"));
+    final Memo memo = requireOwnedMemo(memoId, customSecurityAccount);
     req.getSession().setAttribute("memoId", memoId);
     if (isAdmin(customSecurityAccount)) model.addAttribute("admin", "管理者画面へ");
 
     final List<String> categoryList =
         memoService.findDistinctCategoryByAccount(customSecurityAccount);
-    final Optional<Memo> optionalMemo = memoRepository.findById(memoId);
-    if (optionalMemo.isPresent()) {
-      final Memo memo = optionalMemo.get();
-      model.addAttribute("categoryList", categoryList);
-      model.addAttribute("createdDate", memo.getCreatedDate());
-      model.addAttribute("updatedDate", memo.getUpdatedDate());
-      model.addAttribute("memoForm", makeMemoForm(memo));
-    }
+    model.addAttribute("categoryList", categoryList);
+    model.addAttribute("createdDate", memo.getCreatedDate());
+    model.addAttribute("updatedDate", memo.getUpdatedDate());
+    model.addAttribute("memoForm", makeMemoForm(memo));
     return "memo/memo-details";
   }
 
@@ -299,14 +298,17 @@ public class MemoController {
       Model model,
       @AuthenticationPrincipal CustomSecurityAccount customSecurityAccount,
       RedirectAttributes redirectAttributes) {
-    final long memoId = (long) req.getSession().getAttribute("memoId");
+    final long memoId = sessionMemoId();
     if (result.hasErrors()) {
       model.addAttribute("memoForm", memoForm);
       return "memo/memo-details";
     }
-    final Memo memo = makeMemo(memoForm, customSecurityAccount);
+    final Memo memo = requireOwnedMemo(memoId, customSecurityAccount);
+    memo.setTitle(memoForm.getTitle());
+    memo.setContent(memoForm.getContent());
+    memo.setCategory(memoForm.getCategory());
+    memo.setBookName(memoForm.getBookName());
     memo.setUpdatedDate(new Date());
-    memo.setCreatedDate(memoRepository.findByMemoId(memoId));
     memoRepository.save(memo);
     redirectAttributes.addFlashAttribute("success", "更新が完了しました｡");
     req.getSession().removeAttribute("memoId");
@@ -318,27 +320,39 @@ public class MemoController {
       MemoForm memoForm,
       @AuthenticationPrincipal CustomSecurityAccount customSecurityAccount,
       Model model) {
-    final long memoId = (long) req.getSession().getAttribute("memoId");
+    final long memoId = sessionMemoId();
 
     final List<String> categoryList =
         memoService.findDistinctCategoryByAccount(customSecurityAccount);
-    final Optional<Memo> optional = memoRepository.findById(memoId);
-    if (optional.isPresent()) {
-      final Memo memo = optional.get();
-      model.addAttribute("categoryList", categoryList);
-      model.addAttribute("memo", memo);
-    }
+    final Memo memo = requireOwnedMemo(memoId, customSecurityAccount);
+    model.addAttribute("categoryList", categoryList);
+    model.addAttribute("memo", memo);
 
     return "memo/memo-delete-confirm";
   }
 
   @PostMapping("/delete")
-  public String deleteMemo(RedirectAttributes redirectAttributes) {
-    final long memoId = (long) req.getSession().getAttribute("memoId");
-    memoRepository.deleteById(memoId);
+  public String deleteMemo(
+      RedirectAttributes redirectAttributes,
+      @AuthenticationPrincipal CustomSecurityAccount customSecurityAccount) {
+    final long memoId = sessionMemoId();
+    memoRepository.delete(requireOwnedMemo(memoId, customSecurityAccount));
     req.getSession().removeAttribute("memoId");
     redirectAttributes.addFlashAttribute("success", "削除が完了しました｡");
     return "redirect:/memo/";
+  }
+
+  private Long sessionMemoId() {
+    Object memoId = req.getSession().getAttribute("memoId");
+    if (!(memoId instanceof Long)) {
+      throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+    }
+    return (Long) memoId;
+  }
+
+  private Memo requireOwnedMemo(Long memoId, CustomSecurityAccount account) {
+    return memoRepository.findByMemoIdAndAccount_Id(memoId, account.getId())
+        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
   }
 
   private MemoForm makeMemoForm(Memo memo) {

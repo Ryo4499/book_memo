@@ -2,20 +2,36 @@
 
 ## Usage
 
-```sh
-# change db connection settings
-vi .env
-docker compose build 
-docker compose up -d
+Run these commands from the directory containing this README. Docker Engine and
+Docker Compose v2 are required; Java and Gradle run inside the build image.
 
-# Trouble shooting
-# hardsource run
-./run.sh
-# docker run
-./run.sh docker
-# run jar file
-java -jar $JAVA_OPTS -Dserver.port=$PORT build/libs/BookMemo-0.0.1-SNAPSHOT.jar
+```bash
+cp .env.sample .env
 ```
+
+Set `POSTGRES_USER`, `POSTGRES_PASSWORD` and `POSTGRES_DB` in `.env` to local
+values. `PORT` is the host HTTP port (8080 by default). Compose connects the app
+to its PostgreSQL service automatically, so `DB_URL` is only needed for running
+Java directly outside Compose.
+
+```bash
+docker compose up --build -d
+```
+
+Open `http://localhost:8080` (or the configured `PORT`) and create an account.
+The default startup initializes roles without creating sample accounts, and
+preserves accounts and memos across application restarts. The database is stored
+in the Compose project's `dbvol` volume.
+
+To stop the application while keeping the database:
+
+```bash
+docker compose down
+```
+
+The existing Nginx and Certbot services are optional and use the `tls` profile.
+They require domain and certificate configuration before use; they are not
+needed for local HTTP startup.
 
 ## How to Deploy
 

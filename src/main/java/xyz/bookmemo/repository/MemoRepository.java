@@ -2,6 +2,7 @@ package xyz.bookmemo.repository;
 
 import java.util.Date;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -13,6 +14,8 @@ import xyz.bookmemo.entity.Memo;
 
 @Repository
 public interface MemoRepository extends JpaRepository<Memo, Long> {
+  Optional<Memo> findByMemoIdAndAccount_Id(Long memoId, Long accountId);
+
   /**
    * > Find the createdDate of the Memo with the given memoId
    *

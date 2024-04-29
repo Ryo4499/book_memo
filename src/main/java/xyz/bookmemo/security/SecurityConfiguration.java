@@ -127,7 +127,7 @@ public class SecurityConfiguration extends WebSecurityConfigurerAdapter {
   @Override
   protected void configure(HttpSecurity http) throws Exception {
     http.authorizeRequests()
-        .antMatchers("/", "/signup", "/signupsuccess", "/thanks")
+        .antMatchers("/", "/signup", "/signup-success", "/thanks")
         .permitAll()
         .antMatchers("/admin**/**")
         .hasRole("ADMIN")

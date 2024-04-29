@@ -1,5 +1,6 @@
 services:
   certbot:
+    profiles: [tls]
     build:
       context: ./certbot
       dockerfile: Dockerfile
@@ -20,6 +21,7 @@ services:
     networks:
       app_net:
   proxy:
+    profiles: [tls]
     build:
       context: ./nginx
       dockerfile: Dockerfile
@@ -62,18 +64,18 @@ services:
   app:
     build:
       context: .
-    tty: true
-    stdin_open: true
-    volumes:
-      - type: bind
-        source: .
-        target: /BookMemo
-    working_dir: /BookMemo
-    env_file:
-      - .env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      DB_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:?Set POSTGRES_DB}
+      PORT: 8080
+      JAVA_TOOL_OPTIONS: -Xmx512m
+    ports:
+      - "127.0.0.1:${PORT:-8080}:8080"
     depends_on:
-      - db
-    restart: always
+      db:
+        condition: service_healthy
+    restart: unless-stopped
     networks:
       - app_net
       - db_net
@@ -81,8 +83,10 @@ services:
     image: postgres:14-alpine
     tty: true
     stdin_open: true
-    env_file:
-      - .env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB}
     volumes:
       - type: volume
         source: dbvol
@@ -91,7 +95,7 @@ services:
     networks:
       - db_net
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready"]
+      test: ["CMD-SHELL", 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
       interval: 5s
       retries: 5
       start_period: 5s
@@ -101,26 +105,7 @@ volumes:
   dbvol:
 
 networks:
-  default:
-    external: false
   nginx_net:
-    driver: bridge
-    internal: false
-    ipam:
-      driver: default
-      config:
-        - subnet: 172.30.0.0/24
   app_net:
-    driver: bridge
-    internal: true
-    ipam:
-      driver: default
-      config:
-        - subnet: 172.30.3.0/24
   db_net:
-    driver: bridge
     internal: true
-    ipam:
-      driver: default
-      config:
-        - subnet: 172.30.5.0/24

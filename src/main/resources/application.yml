@@ -1,0 +1,52 @@
+#デプロイ時に変更
+spring:
+  #本番
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    username: ${POSTGRES_USER}
+    password: ${POSTGRES_PASSWORD}
+    url: ${DB_URL}
+  sql:
+    init:
+      mode: always
+  session:
+    store-type: jdbc
+    jdbc:
+      initialize-schema: always
+      schema: classpath:org/springframework/session/jdbc/schema-postgresql.sql
+      table-name: SPRING_SESSION
+    timeout: 1800
+  jpa:
+    database: POSTGRESQL
+    database-platform: org.hibernate.dialect.PostgreSQL94Dialect
+    defer-datasource-initialization: true
+    generate-ddl: true
+    show-sql: false
+    hibernate:
+      ddl-auto: update
+    properties:
+      "[hibernate.jdbc.time_zone]": Asia/Tokyo
+  h2:
+    console:
+      enabled: false
+  thymeleaf:
+    cache: false
+  devtools:
+    add-properties: true
+    livereload:
+      enabled: true
+    remote:
+      restart:
+        enabled: true
+server:
+  address: 0.0.0.0
+  port: ${PORT}
+management:
+  server:
+    address: 127.0.0.1
+    port: 5555
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+        exclude: "env,beans,info,health,shutdown"
